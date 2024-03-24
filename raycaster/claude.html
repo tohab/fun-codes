@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>3D Raycaster</title>
+ <style>
+   body {
+     margin: 0;
+     overflow: hidden;
+   }
+   canvas {
+     display: block;
+   }
+   #minimap {
+     position: absolute;
+     top: 10px;
+     right: 10px;
+     width: 200px;
+     height: 200px;
+     background-color: rgba(0, 0, 0, 0.5);
+   }
+ </style>
+</head>
+<body>
+ <canvas id="canvas"></canvas>
+ <canvas id="minimap"></canvas>
+
+ <script>
+   const canvas = document.getElementById('canvas');
+   const ctx = canvas.getContext('2d');
+   const minimapCanvas = document.getElementById('minimap');
+   const minimapCtx = minimapCanvas.getContext('2d');
+
+   const screenWidth = window.innerWidth;
+   const screenHeight = window.innerHeight;
+   canvas.width = screenWidth;
+   canvas.height = screenHeight;
+   minimapCanvas.width = 200;
+   minimapCanvas.height = 200;
+
+   const mapWidth = 16;
+   const mapHeight = 16;
+   const map = [
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+   ];
+
+   const tileSize = 64;
+   const fov = Math.PI / 3;
+   const numRays = screenWidth;
+   const moveSpeed = 0.1;
+   const rotSpeed = 0.05;
+
+   let playerX = 8;
+   let playerY = 8;
+   let playerAngle = 0;
+
+   function drawPlayer(x, y, angle) {
+     ctx.save();
+     ctx.translate(x * tileSize, y * tileSize);
+     ctx.rotate(angle);
+     ctx.fillStyle = 'red';
+     ctx.beginPath();
+     ctx.moveTo(0, 0);
+     ctx.lineTo(20, 20);
+     ctx.lineTo(-20, 20);
+     ctx.closePath();
+     ctx.fill();
+     ctx.restore();
+   }
+
+   function drawMinimap() {
+     minimapCtx.clearRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+     for (let y = 0; y < mapHeight; y++) {
+       for (let x = 0; x < mapWidth; x++) {
+         const tileType = map[y][x];
+         const color = tileType === 1 ? '#888' : tileType === 2 ? '#0f0' : '#fff';
+         minimapCtx.fillStyle = color;
+         minimapCtx.fillRect(x * 12, y * 12, 12, 12);
+       }
+     }
+
+     minimapCtx.fillStyle = 'red';
+     minimapCtx.fillRect(playerX * 12, playerY * 12, 8, 8);
+   }
+
+   function castRays() {
+     for (let i = 0; i < numRays; i++) {
+       const rayAngle = playerAngle - fov / 2 + (i / numRays) * fov;
+       const distanceToWall = cast(rayAngle);
+       const wallHeight = (tileSize / distanceToWall) * (screenWidth / numRays);
+       const wallTopPixel = (screenHeight / 2) - (wallHeight / 2);
+       const wallBottomPixel = (screenHeight / 2) + (wallHeight / 2);
+
+       ctx.fillStyle = '#fff';
+       ctx.fillRect(i, wallTopPixel, 1, wallBottomPixel - wallTopPixel);
+     }
+   }
+
+   function cast(angle) {
+     const right = Math.cos(angle);
+     const down = Math.sin(angle);
+
+     let x = playerX;
+     let y = playerY;
+
+     let distanceToWall = 0;
+     let hitWall = false;
+     let boundary = false;
+
+     while (!hitWall && !boundary) {
+       distanceToWall += 0.1;
+
+       const xNext = x + right * 0.1;
+       const yNext = y + down * 0.1;
+
+       x = xNext;
+       y = yNext;
+
+       if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight) {
+         boundary = true;
+         x = ((x % mapWidth) + mapWidth) % mapWidth;
+         y = ((y % mapHeight) + mapHeight) % mapHeight;
+       }
+
+       const tileX = Math.floor(x);
+       const tileY = Math.floor(y);
+
+       if (map[tileY][tileX] === 1) {
+         hitWall = true;
+       }
+     }
+
+     return distanceToWall;
+   }
+
+   function gameLoop() {
+     ctx.clearRect(0, 0, screenWidth, screenHeight);
+
+     drawMinimap();
+     castRays();
+     drawPlayer(playerX, playerY, playerAngle);
+
+     window.requestAnimationFrame(gameLoop);
+   }
+
+   document.addEventListener('keydown', (event) => {
+     switch (event.keyCode) {
+       case 37: // Left arrow
+         playerAngle -= rotSpeed;
+         break;
+       case 39: // Right arrow
+         playerAngle += rotSpeed;
+         break;
+       case 38: // Up arrow
+         playerX += Math.cos(playerAngle) * moveSpeed;
+         playerY += Math.sin(playerAngle) * moveSpeed;
+         break;
+       case 40: // Down arrow
+         playerX -= Math.cos(playerAngle) * moveSpeed;
+         playerY -= Math.sin(playerAngle) * moveSpeed;
+         break;
+     }
+   });
+
+   gameLoop();
+ </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Maze Raycaster</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+    font-family: Arial, sans-serif;
+    color: #FFF;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+  #miniMap {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 200px;
+    height: 200px;
+    border: 2px solid #FFF;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="miniMap"></div>
+
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const miniMap = document.getElementById('miniMap');
+  const miniMapCtx = miniMap.getContext('2d');
+
+  const mapWidth = 30;
+  const mapHeight = 30;
+  const tileSize = 20;
+  const player = {
+    x: 1.5,
+    y: 1.5,
+    direction: Math.PI / 4,
+    moveSpeed: 0.1,
+    rotationSpeed: 0.02
+  };
+
+  let maze = [];
+
+  function generateMaze() {
+    // Generate maze logic here
+    // For simplicity, randomly generate walls
+    for (let y = 0; y < mapHeight; y++) {
+      maze[y] = [];
+      for (let x = 0; x < mapWidth; x++) {
+        maze[y][x] = Math.random() < 0.3 ? 1 : 0;
+      }
+    }
+  }
+
+  function drawMiniMap() {
+    miniMapCtx.clearRect(0, 0, miniMap.width, miniMap.height);
+    miniMapCtx.fillStyle = '#FFF';
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        if (maze[y][x] === 1) {
+          miniMapCtx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        }
+      }
+    }
+    miniMapCtx.fillStyle = 'red';
+    miniMapCtx.fillRect(player.x * tileSize, player.y * tileSize, tileSize / 2, tileSize / 2);
+  }
+
+  function castRays() {
+    // Raycasting logic here
+    // For simplicity, use basic raycasting algorithm
+    for (let rayAngle = 0; rayAngle < Math.PI * 2; rayAngle += Math.PI / 180) {
+      const angleSin = Math.sin(player.direction + rayAngle);
+      const angleCos = Math.cos(player.direction + rayAngle);
+
+      let distanceToWall = 0;
+      let hitWall = false;
+      let wallX, wallY;
+
+      while (!hitWall && distanceToWall < 20) {
+        distanceToWall += 0.1;
+        const testX = Math.floor(player.x + angleCos * distanceToWall);
+        const testY = Math.floor(player.y + angleSin * distanceToWall);
+
+        if (testX < 0 || testX >= mapWidth || testY < 0 || testY >= mapHeight || maze[testY][testX] === 1) {
+          hitWall = true;
+          wallX = testX;
+          wallY = testY;
+        }
+      }
+
+      // Draw the ray on the canvas
+      const ceiling = canvas.height / 2 - canvas.height / distanceToWall;
+      const floor = canvas.height - ceiling;
+      const wallHeight = canvas.height - (ceiling + floor);
+      const wallColor = hitWall ? '#FFF' : '#333';
+      ctx.strokeStyle = wallColor;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(rayAngle * (canvas.width / (Math.PI * 2)), ceiling);
+      ctx.lineTo(rayAngle * (canvas.width / (Math.PI * 2)), ceiling + wallHeight);
+      ctx.stroke();
+    }
+  }
+
+  function update() {
+    // Handle player movement
+    document.addEventListener('keydown', (event) => {
+      const key = event.key;
+      if (key === 'ArrowUp' || key === 'w') {
+        player.x += Math.sin(player.direction) * player.moveSpeed;
+        player.y += Math.cos(player.direction) * player.moveSpeed;
+      } else if (key === 'ArrowDown' || key === 's') {
+        player.x -= Math.sin(player.direction) * player.moveSpeed;
+        player.y -= Math.cos(player.direction) * player.moveSpeed;
+      } else if (key === 'ArrowLeft' || key === 'a') {
+        player.direction -= player.rotationSpeed;
+      } else if (key === 'ArrowRight' || key === 'd') {
+        player.direction += player.rotationSpeed;
+      }
+
+      // Wrap around the map
+      if (player.x < 0) player.x += mapWidth;
+      if (player.x >= mapWidth) player.x -= mapWidth;
+      if (player.y < 0) player.y += mapHeight;
+      if (player.y >= mapHeight) player.y -= mapHeight;
+
+      draw();
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    castRays();
+    drawMiniMap();
+  }
+
+  function init() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    miniMap.width = mapWidth * tileSize;
+    miniMap.height = mapHeight * tileSize;
+    generateMaze();
+    update();
+    draw();
+  }
+
+  init();
+</script>
+</body>
+</html>

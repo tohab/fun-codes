@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bird Flock Simulation</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="1000" height="1000"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const numBirds = 20;
+        const birdSize = 20;
+        const maxSpeed = 6;
+        const separationDistance = 40;
+        const alignmentDistance = 40;
+        const cohesionDistance = 40;
+        const radius = Math.min(canvas.width, canvas.height) / 2;
+
+        const birds = [];
+        let mouseX = canvas.width / 2;
+        let mouseY = canvas.height / 2;
+
+        class Bird {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.vx = Math.random() * 4 - 2;
+                this.vy = Math.random() * 4 - 2;
+                this.maxSpeed = maxSpeed * (0.8 + 0.4 * Math.random());
+                this.turningFactor = 0.8 + 0.4 * Math.random();
+            }
+
+            move() {
+                const separationVector = this.getSeparationVector();
+                const alignmentVector = this.getAlignmentVector();
+                const cohesionVector = this.getCohesionVector();
+                const attractionVector = this.getAttractionVector();
+
+                this.vx += (separationVector.x + alignmentVector.x + cohesionVector.x + attractionVector.x) * this.turningFactor;
+                this.vy += (separationVector.y + alignmentVector.y + cohesionVector.y + attractionVector.y) * this.turningFactor;
+
+                this.limitSpeed();
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.handleBoundaries();
+            }
+
+            getSeparationVector() {
+                let separationVector = { x: 0, y: 0 };
+                let count = 0;
+
+                for (const otherBird of birds) {
+                    if (this !== otherBird) {
+                        const distance = Math.sqrt((this.x - otherBird.x) ** 2 + (this.y - otherBird.y) ** 2);
+                        if (distance < separationDistance) {
+                            const dx = this.x - otherBird.x;
+                            const dy = this.y - otherBird.y;
+                            separationVector.x += 50 * dx / distance ** 2;
+                            separationVector.y += 50 * dy / distance ** 2;
+                            count++;
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    separationVector.x /= count;
+                    separationVector.y /= count;
+                }
+
+                return separationVector;
+            }
+
+            getAlignmentVector() {
+                let alignmentVector = { x: 0, y: 0 };
+                let count = 0;
+
+                for (const otherBird of birds) {
+                    if (this !== otherBird) {
+                        const distance = Math.sqrt((this.x - otherBird.x) ** 2 + (this.y - otherBird.y) ** 2);
+                        if (distance < alignmentDistance) {
+                            alignmentVector.x += otherBird.vx;
+                            alignmentVector.y += otherBird.vy;
+                            count++;
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    alignmentVector.x /= count;
+                    alignmentVector.y /= count;
+                    alignmentVector.x = (alignmentVector.x - this.vx) / 10;
+                    alignmentVector.y = (alignmentVector.y - this.vy) / 10;
+                }
+
+                return alignmentVector;
+            }
+
+            getCohesionVector() {
+                let cohesionVector = { x: 0, y: 0 };
+                let count = 0;
+
+                for (const otherBird of birds) {
+                    if (this !== otherBird) {
+                        const distance = Math.sqrt((this.x - otherBird.x) ** 2 + (this.y - otherBird.y) ** 2);
+                        if (distance < cohesionDistance) {
+                            cohesionVector.x += otherBird.x;
+                            cohesionVector.y += otherBird.y;
+                            count++;
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    cohesionVector.x /= count;
+                    cohesionVector.y /= count;
+                    cohesionVector.x = (cohesionVector.x - this.x) / 80;
+                    cohesionVector.y = (cohesionVector.y - this.y) / 80;
+                }
+
+                return cohesionVector;
+            }
+
+            getAttractionVector() {
+                const attractionVector = { x: 0, y: 0 };
+                const distance = Math.sqrt((this.x - mouseX) ** 2 + (this.y - mouseY) ** 2);
+                if (distance > 100) {
+                    attractionVector.x = (mouseX - this.x) / (distance * 2);
+                    attractionVector.y = (mouseY - this.y) / (distance * 2);
+                }
+                return attractionVector;
+            }
+
+            limitSpeed() {
+                const speed = Math.sqrt(this.vx ** 2 + this.vy ** 2);
+                if (speed > this.maxSpeed) {
+                    this.vx = (this.vx / speed) * this.maxSpeed;
+                    this.vy = (this.vy / speed) * this.maxSpeed;
+                }
+            }
+
+            handleBoundaries() {
+    const distanceFromCenter = Math.sqrt((this.x - canvas.width / 2) ** 2 + (this.y - canvas.height / 2) ** 2);
+    if (distanceFromCenter > radius - birdSize) {
+        const angle = Math.atan2(this.y - canvas.height / 2, this.x - canvas.width / 2);
+        this.x = canvas.width / 2 + (radius - birdSize) * Math.cos(angle);
+        this.y = canvas.height / 2 + (radius - birdSize) * Math.sin(angle);
+    }
+}
+
+            draw() {
+                ctx.font = `${birdSize}px Arial`;
+                ctx.fillText('🐦', this.x - birdSize / 2, this.y + birdSize / 4);
+            }
+        }
+
+        function init() {
+            for (let i = 0; i < numBirds; i++) {
+                birds.push(new Bird());
+            }
+        }
+
+        function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Begin clipping path
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
+    ctx.clip();
+
+    for (const bird of birds) {
+        bird.move();
+        bird.draw();
+    }
+
+    // Reset clipping path
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.clip();
+
+    requestAnimationFrame(animate);
+}
+
+        canvas.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX - canvas.offsetLeft;
+            mouseY = event.clientY - canvas.offsetTop;
+        });
+
+        init();
+        animate();
+    </script>
+</body>
+</html>

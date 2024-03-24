@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #minimap {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 200px;
+            height: 200px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <canvas id="minimap"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const minimap = document.getElementById('minimap');
+        const mCtx = minimap.getContext('2d');
+
+        const mapSize = 16;
+        const cellSize = 16;
+        const wallHeight = 100;
+        const fov = 90;
+        const halfFov = fov / 2;
+        const viewDistance = mapSize * cellSize / 4 / Math.tan(halfFov * Math.PI / 180);
+
+        const map = generateMaze(mapSize, mapSize);
+        let player = { x: 1, y: 1, angle: 0 };
+
+        function generateMaze(w, h) {
+            let maze = Array(w).fill().map(() => Array(h).fill(false));
+            for (let x = 0; x < w; x++) {
+                for (let y = 0; y < h; y++) {
+                    maze[x][y] = Math.random() < 0.05;
+                }
+            }
+            return maze;
+        }
+
+        function drawMaze() {
+            for (let x = 0; x < mapSize; x++) {
+                for (let y = 0; y < mapSize; y++) {
+                    if (map[x][y]) {
+                        mCtx.fillRect(x * (minimap.width / mapSize), y * (minimap.height / mapSize), minimap.width / mapSize, minimap.height / mapSize);
+                    }
+                }
+            }
+
+            const playerX = player.x * (minimap.width / mapSize) + (minimap.width / mapSize) / 2;
+            const playerY = player.y * (minimap.height / mapSize) + (minimap.height / mapSize) / 2;
+            const arrowSize = (minimap.width / mapSize) * 10;
+
+            mCtx.strokeStyle = 'red';
+            mCtx.fillStyle = 'red';
+            mCtx.lineWidth = 3;
+            mCtx.beginPath();
+
+            // Calculate the arrow's direction based on the player's angle
+            const arrowAngle = player.angle - Math.PI / 2;
+            const endX = playerX + arrowSize * Math.cos(arrowAngle);
+            const endY = playerY + arrowSize * Math.sin(arrowAngle);
+
+            // Draw the arrow
+            mCtx.moveTo(playerX, playerY);
+            mCtx.lineTo(endX, endY);
+            mCtx.lineTo(endX - arrowSize * Math.sin(arrowAngle) * 0.5, endY + arrowSize * Math.cos(arrowAngle) * 0.5);
+            mCtx.moveTo(endX, endY);
+            mCtx.lineTo(endX + arrowSize * Math.sin(arrowAngle) * 0.5, endY - arrowSize * Math.cos(arrowAngle) * 0.5);
+            mCtx.fill();
+            mCtx.fillStyle = 'green';
+
+        }
+
+
+        function draw3D() {
+            const columns = canvas.width; // Set columns to match the canvas width
+            const columnWidth = canvas.width / columns;
+
+            for (let col = 0; col < columns; col++) {
+                const rayAngle = (player.angle - halfFov) + col * (fov / columns);
+                let distance = 0;
+                let hitWall = false;
+                let wallX = 0;
+                let wallY = 0;
+
+                while (!hitWall && distance < viewDistance) {
+                    distance++;
+                    const x = Math.floor(player.x + Math.cos(rayAngle) * distance);
+                    const y = Math.floor(player.y + Math.sin(rayAngle) * distance);
+
+                    if (x < 0 || x >= mapSize || y < 0 || y >= mapSize) {
+                        hitWall = true;
+                    } else if (map[x][y]) {
+                        hitWall = true;
+                        wallX = x;
+                        wallY = y;
+                    }
+                }
+
+                if (hitWall) {
+                    const wallDistance = Math.sqrt(Math.pow(player.x - wallX, 2) + Math.pow(player.y - wallY, 2));
+                    const wallHeightOnScreen = (wallHeight / wallDistance) * (viewDistance / fov);
+                    const wallTop = (canvas.height / 2) - (wallHeightOnScreen / 2);
+                    const wallBottom = (canvas.height / 2) + (wallHeightOnScreen / 2);
+
+                    // Calculate brightness based on distance
+                    const maxDistance = viewDistance;
+                    const brightness = 1 - (wallDistance / maxDistance);
+                    const shade = `rgba(${brightness}, ${brightness}, ${brightness}, ${brightness})`;
+
+                    ctx.strokeStyle = shade;
+                    ctx.beginPath();
+                    ctx.moveTo(col * columnWidth, wallTop);
+                    ctx.lineTo(col * columnWidth, wallBottom);
+                    ctx.stroke();
+
+
+                    ctx.fillStyle = 'lightblue';
+                    ctx.fillRect(col * columnWidth, 0, columnWidth, wallTop);
+
+                    ctx.fillStyle = 'darkgreen';
+                    ctx.fillRect(col * columnWidth, wallBottom, columnWidth, canvas.height - wallBottom);
+                }
+            }
+        }
+        function isColliding(x, y) {
+            if (x < 0 || x >= mapSize || y < 0 || y >= mapSize) {
+                return true;
+            }
+            return map[Math.floor(x)][Math.floor(y)];
+        }
+
+        function update() {
+            let newX = player.x;
+            let newY = player.y;
+
+            if (keyState.ArrowUp) {
+                newX += 0.5 * Math.cos(player.angle);
+                newY += 0.5 * Math.sin(player.angle);
+            }
+            if (keyState.ArrowDown) {
+                newX -= 0.5 * Math.cos(player.angle);
+                newY -= 0.5 * Math.sin(player.angle);
+            }
+            if (keyState.ArrowLeft) {
+                player.angle -= 0.02;
+            }
+            if (keyState.ArrowRight) {
+                player.angle += 0.02;
+            }
+
+            if (!isColliding(newX, newY)) {
+                player.x = newX;
+                player.y = newY;
+            }
+
+            player.x = (player.x + mapSize) % mapSize;
+            player.y = (player.y + mapSize) % mapSize;
+        }
+
+
+        let keyState = {};
+        window.addEventListener('keydown', e => {
+            keyState[e.key] = true;
+        });
+        window.addEventListener('keyup', e => {
+            keyState[e.key] = false;
+        });
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            mCtx.clearRect(0, 0, minimap.width, minimap.height);
+
+            update();
+            drawMaze();
+            draw3D();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        minimap.width = 200;
+        minimap.height = 200;
+
+        gameLoop();
+    </script>
+</body>
+
+</html>
