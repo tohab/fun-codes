@@ -1,60 +1,32 @@
-from langchain.chains.question_answering import load_qa_chain
-from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import DirectoryLoader
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
+from dotenv import load_dotenv
+load_dotenv()
 import os
-import openai
+import langchain
+import langchain_openai
+from langchain.vectorstores import FAISS
+from langchain.chains import RetrievalQA
+from langchain.llms import OpenAI
 
-### VERY MUCH STILL IN PROGRESS  AND NOT WORKING
+# Set up OpenAI API client
+openai_api_key = os.getenv("OPENAI_API_KEY")
+llm = langchain_openai.OpenAI(temperature=0, openai_api_key=openai_api_key)
 
-
-client = openai.OpenAI(
-    base_url = "https://api.endpoints.anyscale.com/v1",
-    api_key = os.getenv("OPENAI_API_KEY")
+# Load the directory of text files into a vector store
+vector_store = FAISS.from_texts(
+    [open(r"llm tests/essay.txt", encoding="utf-8").read()],
+    langchain.llms.OpenAI(openai_api_key=openai_api_key, temperature=0),
+    allow_dangerous_deserialization=True
 )
 
-# initializing the embeddings
-embeddings = OpenAIEmbeddings()
-
-# default model = "gpt-3.5-turbo"
-llm = ChatOpenAI()
-
-directory = r'C:\Users\malat\Desktop\fun codes\llm tests\essay.txt'
-
-def load_docs(directory):
-    loader = DirectoryLoader(directory)
-    documents = loader.load()
-    return documents
-
-documents = load_docs(directory)
-
-def split_docs(documents, chunk_size=500, chunk_overlap=50):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-    )
-    docs = text_splitter.split_documents(documents)
-    return docs
-
-docs = split_docs(documents)
-
-db = Chroma.from_documents(
-    documents=docs, 
-    embedding=embeddings
+# Create the Retrieval QA chain
+qa = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=vector_store.as_retriever(),
+    return_source_documents=True,
 )
 
-chain = load_qa_chain(llm, chain_type="stuff")
-
-def get_answer(query):
-    similar_docs = db.similarity_search(query, k=2) # get two closest chunks
-    answer = chain.run(input_documents=similar_docs, question=query)
-    return answer
-    
-print("Private Q&A chatbot")
-prompt = input("Enter your query here: ")
-
-if prompt:
-    answer = get_answer(prompt)
-    print(f"Answer: {answer}")   
+# Take input from user and generate response
+user_query = input("Enter your query: ")
+result = qa({"query": user_query})
+print(result['result'])

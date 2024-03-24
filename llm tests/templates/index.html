@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Language Model Web Interface</title>
+</head>
+<body>
+    <h1>Language Model Web Interface</h1>
+    <form method="post">
+        <label for="query">Enter your query:</label>
+        <input type="text" id="query" name="query">
+        <input type="submit" value="Submit">
+    </form>
+    {% if response %}
+    <h2>Response:</h2>
+    <p>{{ response }}</p>
+    {% endif %}
+</body>
+</html>
