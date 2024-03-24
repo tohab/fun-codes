@@ -1,40 +1,53 @@
-from langchain.document_loaders import TextLoader
-from langchain.llms import OpenAIChat
+from langchain.chains.question_answering import load_qa_chain
+from langchain.chat_models import ChatOpenAI
+from langchain.document_loaders import DirectoryLoader
 from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.chains import RetrievalQA
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
-
-import openai
 import os
 
-# Custom OpenAI client for Anyscale
-client = openai.OpenAI(
-    base_url = "https://api.endpoints.anyscale.com/v1",
-    api_key = os.getenv("OPENAI_API_KEY")
-)
+os.environ["OPENAI_API_KEY"] = "OPENAI API KEY"
 
-# Update the loader to use TextLoader and point to your .txt file
-loader = TextLoader("C:/Users/malat/Desktop/fun codes/llm tests/test-post.txt")
-docs = loader.load_and_split()
-
+# initializing the embeddings
 embeddings = OpenAIEmbeddings()
 
-chroma_db = Chroma.from_documents(
-    documents=docs,
-    embedding=embeddings,
-    persist_directory="data",
-    collection_name="lc_chroma_demo"
+# default model = "gpt-3.5-turbo"
+llm = ChatOpenAI()
+
+directory = r"C:\Users\malat\Desktop\fun codes\blog-backup\output"
+
+def load_docs(directory):
+    loader = DirectoryLoader(directory)
+    documents = loader.load()
+    return documents
+
+documents = load_docs(directory)
+
+def split_docs(documents, chunk_size=500, chunk_overlap=50):
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+    docs = text_splitter.split_documents(documents)
+    return docs
+
+docs = split_docs(documents)
+
+db = Chroma.from_documents(
+    documents=docs, 
+    embedding=embeddings
 )
 
-query = "What is this document about?"
+chain = load_qa_chain(llm, chain_type="stuff")
 
-# Custom LLM using the Anyscale client
-llm = OpenAIChat(
-    openai_api=client,
-    model_name="mistralai/Mixtral-8x7B-Instruct-v0.1",
-    temperature=0.7
-)
+def get_answer(query):
+    similar_docs = db.similarity_search(query, k=2) # get two closest chunks
+    answer = chain.run(input_documents=similar_docs, question=query)
+    return answer
+    
+print("Private Q&A chatbot")
+prompt = input("Enter your query here: ")
 
-chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=chroma_db.as_retriever())
-
-response = chain(query)
+if prompt:
+    answer = get_answer(prompt)
+    print(f"Answer: {answer}")   
