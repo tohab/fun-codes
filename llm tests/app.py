@@ -2,7 +2,6 @@ from flask import Flask, render_template, request
 from dotenv import load_dotenv
 import openai
 import os
-import markdown
 
 app = Flask(__name__)
 load_dotenv()
@@ -23,9 +22,8 @@ def index():
             temperature=0.7
         )
         response = chat_completion.choices[0].message.content
-        html_response = markdown.markdown(response)
-        return render_template(os.path.join('templates', 'index.html'), response=html_response)
-    return render_template(os.path.join('templates', 'index.html'))
+        return render_template('index.html', response=response)
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

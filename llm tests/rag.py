@@ -1,32 +1,40 @@
-from dotenv import load_dotenv
-load_dotenv()
-import os
-import langchain
-import langchain_openai
-from langchain.vectorstores import FAISS
+from langchain.document_loaders import TextLoader
+from langchain.llms import OpenAIChat
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
-from langchain.llms import OpenAI
+from langchain.vectorstores import Chroma
 
-# Set up OpenAI API client
-openai_api_key = os.getenv("OPENAI_API_KEY")
-llm = langchain_openai.OpenAI(temperature=0, openai_api_key=openai_api_key)
+import openai
+import os
 
-# Load the directory of text files into a vector store
-vector_store = FAISS.from_texts(
-    [open(r"llm tests/essay.txt", encoding="utf-8").read()],
-    langchain.llms.OpenAI(openai_api_key=openai_api_key, temperature=0),
-    allow_dangerous_deserialization=True
+# Custom OpenAI client for Anyscale
+client = openai.OpenAI(
+    base_url = "https://api.endpoints.anyscale.com/v1",
+    api_key = os.getenv("OPENAI_API_KEY")
 )
 
-# Create the Retrieval QA chain
-qa = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=vector_store.as_retriever(),
-    return_source_documents=True,
+# Update the loader to use TextLoader and point to your .txt file
+loader = TextLoader("C:/Users/malat/Desktop/fun codes/llm tests/test-post.txt")
+docs = loader.load_and_split()
+
+embeddings = OpenAIEmbeddings()
+
+chroma_db = Chroma.from_documents(
+    documents=docs,
+    embedding=embeddings,
+    persist_directory="data",
+    collection_name="lc_chroma_demo"
 )
 
-# Take input from user and generate response
-user_query = input("Enter your query: ")
-result = qa({"query": user_query})
-print(result['result'])
+query = "What is this document about?"
+
+# Custom LLM using the Anyscale client
+llm = OpenAIChat(
+    openai_api=client,
+    model_name="mistralai/Mixtral-8x7B-Instruct-v0.1",
+    temperature=0.7
+)
+
+chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=chroma_db.as_retriever())
+
+response = chain(query)
