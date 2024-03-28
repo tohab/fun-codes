@@ -139,7 +139,7 @@ while running:
             screen.blit(game_over_text, game_over_rect)
             pygame.display.flip()
             # Wait for a few seconds
-            pygame.time.wait(3000)
+            pygame.time.wait(2000)
             # Quit the game
             pygame.quit()
             quit()

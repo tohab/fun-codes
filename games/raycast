@@ -1,0 +1,196 @@
+import pygame
+import math
+
+# Initialize Pygame
+pygame.init()
+
+# Set up the display
+WINDOW_WIDTH = 800
+WINDOW_HEIGHT = 600
+WINDOW_TITLE = "3D Monster Maze"
+display = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+pygame.display.set_caption(WINDOW_TITLE)
+
+# Define colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+RED = (255, 0, 0)
+
+# Define the maze layout
+maze_map = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+    [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
+    [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+    [1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+]
+
+# Define the player's starting position and angle
+player_x = 1.5
+player_y = 1.5
+player_angle = 0
+
+# Define the T-Rex's starting position
+trex_x = 7.5
+trex_y = 7.5
+
+# Define the step size for player movement
+move_step = 0.1
+
+# Define the field of view angle
+fov = math.pi / 3
+
+# Define the distance to the projection plane
+projection_plane_distance = (WINDOW_WIDTH / 2) / math.tan(fov / 2)
+
+# Define the wall height
+wall_height = 1.0
+
+
+def project_point(x, y, player_x, player_y, player_angle):
+    """
+    Project a point in the 3D maze onto the 2D screen.
+    """
+    dx = x - player_x
+    dy = y - player_y
+    proj_x = dx * math.cos(player_angle) - dy * math.sin(player_angle)
+    proj_y = dy * math.cos(player_angle) + dx * math.sin(player_angle)
+    return proj_x, proj_y
+
+# Game loop
+running = True
+while running:
+    # Handle events
+    for event in pygame.event.get():
+        keys_pressed = pygame.key.get_pressed()
+        if keys_pressed[pygame.K_w]:
+            dx = math.cos(player_angle) * move_step
+            dy = math.sin(player_angle) * move_step
+            new_x = player_x + dx
+            new_y = player_y + dy
+            if maze_map[int(new_y)][int(new_x)] == 0:
+                player_x = new_x
+                player_y = new_y
+        elif keys_pressed[pygame.K_s]:
+            dx = -math.cos(player_angle) * move_step
+            dy = -math.sin(player_angle) * move_step
+            new_x = player_x + dx
+            new_y = player_y + dy
+            if maze_map[int(new_y)][int(new_x)] == 0:
+                player_x = new_x
+                player_y = new_y
+        if keys_pressed[pygame.K_a]:
+            player_angle -= move_step
+        elif keys_pressed[pygame.K_d]:
+            player_angle += move_step
+
+    # Clear the display
+    display.fill(BLACK)
+
+    # Render the 3D maze
+    for x in range(WINDOW_WIDTH):
+        # Calculate the ray angle
+        ray_angle = (player_angle - fov / 2) + ((x / WINDOW_WIDTH) * fov)
+
+        # Cast the ray
+        distance_to_wall = 0
+        hit_wall = False
+        wall_hit = None
+        eye_x = math.cos(ray_angle)
+        eye_y = math.sin(ray_angle)
+
+        while not hit_wall and distance_to_wall < 20:
+            distance_to_wall += 0.1
+            test_x = int(player_x + eye_x * distance_to_wall)
+            test_y = int(player_y + eye_y * distance_to_wall)
+
+            # Check if the ray hits a wall
+            if maze_map[test_y][test_x] == 1:
+                hit_wall = True
+                wall_hit = (test_x, test_y)
+
+        # Calculate the wall height based on distance
+        if hit_wall:
+            wall_height_proj = int(WINDOW_HEIGHT / (distance_to_wall * math.cos(ray_angle - player_angle)))
+            wall_top = (WINDOW_HEIGHT / 2) - (wall_height_proj / 2)
+            wall_bottom = wall_top + wall_height_proj
+
+            # Render the wall segment
+            pygame.draw.line(display, (0, 128, 0), (x, wall_top), (x, wall_bottom), 1)
+
+    # Render the T-Rex
+    trex_visible = True
+    dx = trex_x - player_x
+    dy = trex_y - player_y
+    distance_to_trex = math.sqrt(dx ** 2 + dy ** 2)
+    trex_angle = math.atan2(dy, dx)
+
+    eye_x = math.cos(trex_angle)
+    eye_y = math.sin(trex_angle)
+
+    while distance_to_trex < 20:
+        distance_to_trex += 0.1
+        test_x = int(player_x + eye_x * distance_to_trex)
+        test_y = int(player_y + eye_y * distance_to_trex)
+
+        if maze_map[test_y][test_x] == 1:
+            trex_visible = False
+            break
+
+    if trex_visible:
+        trex_x_proj, trex_y_proj = project_point(trex_x, trex_y, player_x, player_y, player_angle)
+        trex_size = int(WINDOW_HEIGHT / trex_y_proj)
+        trex_x_screen = int(trex_x_proj * WINDOW_WIDTH)
+        trex_y_screen = int(WINDOW_HEIGHT / 2 - trex_size / 2)
+        pygame.draw.rect(display, RED, (trex_x_screen, trex_y_screen, trex_size, trex_size))
+    
+    # Render the minimap
+    minimap_width = 100
+    minimap_height = 100
+    minimap_x = WINDOW_WIDTH - minimap_width - 10
+    minimap_y = 10
+
+    # Draw the maze
+    for y in range(len(maze_map)):
+        for x in range(len(maze_map[y])):
+            rect = pygame.Rect(minimap_x + x * minimap_width // len(maze_map[0]),
+                            minimap_y + y * minimap_height // len(maze_map),
+                            minimap_width // len(maze_map[0]),
+                            minimap_height // len(maze_map))
+            if maze_map[y][x] == 1:
+                pygame.draw.rect(display, (0, 128, 0), rect)
+            else:
+                pygame.draw.rect(display, (0, 0, 0), rect)
+
+    # Draw the player
+    # Draw the player
+    player_minimap_x = int(minimap_x + player_x * minimap_width // len(maze_map[0]))
+    player_minimap_y = int(minimap_y + player_y * minimap_height // len(maze_map))
+    v_width = 10
+    v_height = 10
+    v_offset_x = int(v_width / 2)
+    v_offset_y = int(v_height / 2)
+    v_vertex_x = player_minimap_x + int(v_height / 2 * math.cos(player_angle))
+    v_vertex_y = player_minimap_y + int(v_height / 2 * math.sin(player_angle))
+    v_left_x = v_vertex_x - int(v_width / 2 * math.sin(player_angle))
+    v_left_y = v_vertex_y + int(v_width / 2 * math.cos(player_angle))
+    v_right_x = v_vertex_x + int(v_width / 2 * math.sin(player_angle))
+    v_right_y = v_vertex_y - int(v_width / 2 * math.cos(player_angle))
+    pygame.draw.polygon(display, (255, 255, 0), [(v_left_x, v_left_y), (v_vertex_x, v_vertex_y), (v_right_x, v_right_y)])
+
+    # Draw the T-Rex
+    trex_minimap_x = int(minimap_x + trex_x * minimap_width // len(maze_map[0]))
+    trex_minimap_y = int(minimap_y + trex_y * minimap_height // len(maze_map))
+    pygame.draw.rect(display, RED, (trex_minimap_x, trex_minimap_y, 5, 5))
+
+    # Update the display
+    pygame.display.update()
+
+# Quit Pygame
+pygame.quit()
