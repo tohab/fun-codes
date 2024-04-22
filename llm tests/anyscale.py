@@ -9,16 +9,26 @@ client = openai.OpenAI(
 
 def ask_llm(query):
     chat_completion = client.chat.completions.create(
-        model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+        model="mistralai/Mistral-7B-Instruct-v0.1",
         messages=[{"role": "system", "content": "You are a helpful assistant."}, 
             {"role": "user", "content": query}],
-        temperature=0.7
+        temperature=1.0
     )
     return chat_completion.choices[0].message.content
 
+# Loop to prompt user for one-off queries
+while (prompt := input("Enter a prompt (q to quit): ")) != "q":
+    result = ask_llm(prompt)
+    print(result)
+    
 
-# Take input from user, and store in variable "input"
-user_question = input("Enter your question: ")
-my_answer = ask_llm(user_question)
-
-print(my_answer)
+# Anyscale supports the following models.
+#     meta-llama/Llama-3-8b-chat-hf
+#     meta-llama/Llama-3-70b-chat-hf
+#     meta-llama/Llama-2-7b-chat-hf
+#     meta-llama/Llama-2-13b-chat-hf
+#     meta-llama/Llama-2-70b-chat-hf
+#     codellama/CodeLlama-70b-Instruct-hf
+#     mistralai/Mistral-7B-Instruct-v0.1
+#     mistralai/Mixtral-8x7B-Instruct-v0.1
+#     mistralai/Mixtral-8x22B-Instruct-v0.1

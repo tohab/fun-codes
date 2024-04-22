@@ -46,6 +46,33 @@ running = True
 clock = pygame.time.Clock()
 last_zombie_spawn = 0
 
+def game_over(zombies_killed):
+    game_over_text = font.render("Game Over", True, BLACK)
+    game_over_rect = game_over_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 50))
+    screen.blit(game_over_text, game_over_rect)
+
+    score_text = font.render(f"Zombies Killed: {zombies_killed}", True, BLACK)
+    score_rect = score_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
+    screen.blit(score_text, score_rect)
+
+    play_again_text = font.render("Play Again", True, BLACK)
+    play_again_rect = play_again_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 + 50))
+    screen.blit(play_again_text, play_again_rect)
+
+    return play_again_rect
+
+def restart():
+    global player_x, player_y, player_angle, bullet_list, zombie_list, zombies_killed, last_zombie_spawn, zombie_spawn_rate
+    player_x = WINDOW_WIDTH // 2 - player_size // 2
+    player_y = WINDOW_HEIGHT - player_size * 2
+    player_angle = 0
+    bullet_list = []
+    zombie_list = []
+    zombies_killed = 0
+    last_zombie_spawn = 0
+    zombie_spawn_rate = 1
+
+
 while running:
     # Handle events
     for event in pygame.event.get():
@@ -58,7 +85,7 @@ while running:
             bullet_y = player_y + player_size // 2
             bullet_list.append({"x": bullet_x, "y": bullet_y, "angle": bullet_angle})
 
-        # Move player
+    # Move player
     keys = pygame.key.get_pressed()
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
         player_x = (player_x - player_speed) % WINDOW_WIDTH
@@ -128,21 +155,36 @@ while running:
                 zombie_list.remove(zombie)
                 zombies_killed += 1
                 
+    # Check for game over condition
     for zombie in zombie_list:
         if (
             player_x < zombie["x"] + zombie_size/2 < player_x + player_size
             and player_y < zombie["y"] + zombie_size/2 < player_y + player_size
         ):
-            font = pygame.font.Font(None, 36)
-            game_over_text = font.render("Game Over", True, (0, 0, 0))
-            game_over_rect = game_over_text.get_rect(center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2))
-            screen.blit(game_over_text, game_over_rect)
-            pygame.display.flip()
-            # Wait for a few seconds
-            pygame.time.wait(2000)
-            # Quit the game
-            pygame.quit()
-            quit()
+            while True:
+            # Display game over screen
+                play_again_rect = game_over(zombies_killed)
+                quit_rect = pygame.Rect((x_position, y_position), (width, height))  # Define quit button rectangle
+                pygame.draw.rect(screen, RED, quit_rect)  # Draw quit button
+                pygame.display.flip()
+
+                # Check for button click to play again or quit
+                for event in pygame.event.get():
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if play_again_rect.collidepoint(event.pos):
+                            restart()
+                            # Reset the screen
+                            screen.fill(WHITE)
+                            # Exit the game over loop
+                            break
+                        elif quit_rect.collidepoint(event.pos):  # Check if quit button clicked
+                            pygame.quit()
+                            sys.exit()
+                # Exit the game over loop if the player clicks restart
+                else:
+                    continue
+                break
+
 
     # Clear the screen
     screen.fill(WHITE)
